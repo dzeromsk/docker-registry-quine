@@ -18,8 +18,8 @@ import (
 
 // Media types
 const (
-	MediaTypeConfig   = "application/vnd.docker.container.image.v1+json"
 	MediaTypeManifest = "application/vnd.docker.distribution.manifest.v2+json"
+	MediaTypeConfig   = "application/vnd.docker.container.image.v1+json"
 	MediaTypeLayer    = "application/vnd.docker.image.rootfs.diff.tar.gzip"
 )
 
@@ -52,25 +52,30 @@ func main() {
 		switch chi.URLParam(r, "tag") {
 		case "latest":
 			w.Header().Set(ContentType, MediaTypeManifest)
-			w.Header().Add(DockerContentDigest, registry.ManifestDigest)
+			w.Header().Set(DockerContentDigest, registry.ManifestDigest)
 			w.Write(registry.Manifest)
 		case registry.ManifestDigest:
 			w.Header().Set(ContentType, MediaTypeManifest)
-			w.Header().Add(DockerContentDigest, registry.ManifestDigest)
 			w.Write(registry.Manifest)
 		default:
-			http.Error(w, "{}", 404)
+			http.Error(w, http.StatusText(404), 404)
 		}
 	})
 
 	r.Get("/v2/quine/blobs/{blob}", func(w http.ResponseWriter, r *http.Request) {
-		switch chi.URLParam(r, "blob") {
+		switch blob := chi.URLParam(r, "blob"); blob {
 		case registry.ConfigDigest:
-			w.Header().Set("Content-Type", MediaTypeConfig)
-			w.Header().Set(DockerContentDigest, registry.ConfigDigest)
 			w.Write(registry.Config)
 		case registry.LayerDigest:
-			w.Header().Add(DockerContentDigest, registry.LayerDigest)
+			http.Redirect(w, r, "/static/"+blob, http.StatusSeeOther)
+		default:
+			http.Error(w, http.StatusText(404), 404)
+		}
+	})
+
+	r.Get("/static/{blob}", func(w http.ResponseWriter, r *http.Request) {
+		switch chi.URLParam(r, "blob") {
+		case registry.LayerDigest:
 			w.Write(registry.Layer)
 		default:
 			http.Error(w, http.StatusText(404), 404)
